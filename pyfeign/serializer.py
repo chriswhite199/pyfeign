@@ -2,6 +2,8 @@ import abc
 import json
 from typing import Tuple, Any, Union, Optional
 
+from requests import Response
+
 
 class BodySerializer(abc.ABC):
     @abc.abstractmethod
@@ -11,7 +13,6 @@ class BodySerializer(abc.ABC):
         :param body:
         :return: [content-type, body]
         """
-        pass
 
 
 class TypedBodySerializer(BodySerializer, abc.ABC):
@@ -43,3 +44,10 @@ class JsonBodySerializer(TypedBodySerializer):
 
     def typed_serialize(self, body: Any) -> Union[str, bytes]:
         return json.dumps(body)
+
+
+class BodyDeserializer(abc.ABC):
+    def deserialize(self, response: Response) -> Any:
+        """
+        Deserialize a response
+        """

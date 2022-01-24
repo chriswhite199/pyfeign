@@ -1,6 +1,7 @@
 from typing import Optional, Any, Dict
 
-from requests import Session
+import pytest
+from requests import Session, HTTPError
 from requests_mock import Mocker
 
 import pyfeign
@@ -19,12 +20,12 @@ def get_by_id(id_val: str = pyfeign.Path('id'),
     """
 
 
-@pyfeign.post('http://localhost:8080/')
+@pyfeign.post('http://localhost:8080/', expected_status=201)
 def add_new(body: Dict[str, Any] = pyfeign.Body()):
     pass
 
 
-@pyfeign.put('/{id}', config=config, default_headers=dict(header1='value1'))
+@pyfeign.put('/{id}', config=config, default_headers=dict(header1='value1'), expected_status=[200, 202])
 def update(id: str, body: Dict[str, Any] = pyfeign.Body()):
     pass
 
@@ -77,9 +78,16 @@ def test_get(requests_mock: Mocker):
     assert get_by_id('ghi', cookie='test-me') == resp_json
 
 
+def test_raise_for_status_status(requests_mock: Mocker):
+    requests_mock.get('http://localhost/err', status_code=404)
+    with pytest.raises(HTTPError):
+        get_by_id('err')
+
+
 def test_post(requests_mock: Mocker):
-    requests_mock.post('http://localhost:8080/', additional_matcher=lambda req: req.json() == dict(field1='abc'))
-    assert add_new(dict(field1='abc')).status_code == 200
+    requests_mock.post('http://localhost:8080/', additional_matcher=lambda req: req.json() == dict(field1='abc'),
+                       status_code=201)
+    assert add_new(dict(field1='abc')).status_code == 201
 
 
 def test_put(requests_mock: Mocker):

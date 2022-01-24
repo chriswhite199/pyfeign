@@ -4,10 +4,10 @@ import json
 import logging
 import re
 from functools import wraps
-from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List
+from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List, Union
 
 import requests
-from requests import Response
+from requests import Response, HTTPError
 from requests.utils import CaseInsensitiveDict
 
 from pyfeign.config import Config
@@ -75,23 +75,21 @@ def method(http_method: str,
            url: str,
            *,
            config: Optional[Config] = None,
-           default_headers: Optional[Dict[str, Any]] = None,
+           default_headers: Optional[Union[CaseInsensitiveDict, Dict[str, Any]]] = None,
            default_params: Optional[Dict[str, Any]] = None,
-           default_cookies: Optional[Dict[str, Any]] = None):
-    default_headers: CaseInsensitiveDict = CaseInsensitiveDict(default_headers or {})
+           default_cookies: Optional[Dict[str, Any]] = None,
+           expected_status: Optional[Union[int, List[int]]] = None):
+    default_headers: CaseInsensitiveDict = CaseInsensitiveDict(default_headers or {})  # type: ignore
     default_params = default_params or {}
     default_cookies = default_cookies or {}
+    if type(expected_status) == int:
+        expected_status = [expected_status]
 
     def decorator(func: F) -> F:
         arg_spec = inspect.getfullargspec(func)
         return_type = arg_spec.annotations and arg_spec.annotations.get('return', Response)
         defaults = arg_spec.defaults if arg_spec.defaults else tuple()
         default_len = len(defaults)
-
-        def validate_defaults():
-            for idx, default in enumerate(defaults):
-                if default is None:
-                    raise SyntaxError(f'{func.__name__} - arg {arg_spec.args[idx]} has no default value')
 
         def merge_args_into_kwargs(*args, kwargs: Dict[str, Any]):
             if args:
@@ -163,7 +161,11 @@ def method(http_method: str,
             else:
                 resp = requests.request(**request_args)
 
-            resp.raise_for_status()
+            if expected_status is None:
+                resp.raise_for_status()
+            elif resp.status_code not in expected_status:
+                raise HTTPError(f'Unexpected response HTTP:{resp.status_code} not in {expected_status}')
+
             if return_type in [Dict, List]:
                 return resp.json()
             elif return_type == str:
@@ -171,7 +173,6 @@ def method(http_method: str,
             else:
                 return resp
 
-        validate_defaults()
         return cast(F, wrapper)
 
     return decorator
@@ -181,7 +182,8 @@ def get(url: str, *,
         config: Optional[Config] = None,
         default_headers: Optional[Dict[str, Any]] = None,
         default_params: Optional[Dict[str, Any]] = None,
-        default_cookies: Optional[Dict[str, Any]] = None):
+        default_cookies: Optional[Dict[str, Any]] = None,
+        expected_status: Optional[Union[int, List[int]]] = None):
     return method('GET', **locals())
 
 
@@ -189,7 +191,8 @@ def post(url: str, *,
          config: Optional[Config] = None,
          default_headers: Optional[Dict[str, Any]] = None,
          default_params: Optional[Dict[str, Any]] = None,
-         default_cookies: Optional[Dict[str, Any]] = None):
+         default_cookies: Optional[Dict[str, Any]] = None,
+         expected_status: Optional[Union[int, List[int]]] = None):
     return method('POST', **locals())
 
 
@@ -197,7 +200,8 @@ def put(url: str, *,
         config: Optional[Config] = None,
         default_headers: Optional[Dict[str, Any]] = None,
         default_params: Optional[Dict[str, Any]] = None,
-        default_cookies: Optional[Dict[str, Any]] = None):
+        default_cookies: Optional[Dict[str, Any]] = None,
+        expected_status: Optional[Union[int, List[int]]] = None):
     return method('PUT', **locals())
 
 
@@ -205,7 +209,8 @@ def head(url: str, *,
          config: Optional[Config] = None,
          default_headers: Optional[Dict[str, Any]] = None,
          default_params: Optional[Dict[str, Any]] = None,
-         default_cookies: Optional[Dict[str, Any]] = None):
+         default_cookies: Optional[Dict[str, Any]] = None,
+         expected_status: Optional[Union[int, List[int]]] = None):
     return method('HEAD', **locals())
 
 
@@ -213,7 +218,8 @@ def delete(url: str, *,
            config: Optional[Config] = None,
            default_headers: Optional[Dict[str, Any]] = None,
            default_params: Optional[Dict[str, Any]] = None,
-           default_cookies: Optional[Dict[str, Any]] = None):
+           default_cookies: Optional[Dict[str, Any]] = None,
+           expected_status: Optional[Union[int, List[int]]] = None):
     return method('DELETE', **locals())
 
 
@@ -221,7 +227,8 @@ def patch(url: str, *,
           config: Optional[Config] = None,
           default_headers: Optional[Dict[str, Any]] = None,
           default_params: Optional[Dict[str, Any]] = None,
-          default_cookies: Optional[Dict[str, Any]] = None):
+          default_cookies: Optional[Dict[str, Any]] = None,
+          expected_status: Optional[Union[int, List[int]]] = None):
     return method('PATCH', **locals())
 
 
@@ -229,7 +236,8 @@ def options(url: str, *,
             config: Optional[Config] = None,
             default_headers: Optional[Dict[str, Any]] = None,
             default_params: Optional[Dict[str, Any]] = None,
-            default_cookies: Optional[Dict[str, Any]] = None):
+            default_cookies: Optional[Dict[str, Any]] = None,
+            expected_status: Optional[Union[int, List[int]]] = None):
     return method('OPTIONS', **locals())
 
 
@@ -237,5 +245,6 @@ def trace(url: str, *,
           config: Optional[Config] = None,
           default_headers: Optional[Dict[str, Any]] = None,
           default_params: Optional[Dict[str, Any]] = None,
-          default_cookies: Optional[Dict[str, Any]] = None):
+          default_cookies: Optional[Dict[str, Any]] = None,
+          expected_status: Optional[Union[int, List[int]]] = None):
     return method('TRACE', **locals())
