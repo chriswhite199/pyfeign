@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from functools import wraps
-from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List, Union
+from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List, Union, Type
 
 import requests
 from requests import Response, HTTPError
@@ -82,6 +82,7 @@ def method(http_method: str,
     default_headers: CaseInsensitiveDict = CaseInsensitiveDict(default_headers or {})  # type: ignore
     default_params = default_params or {}
     default_cookies = default_cookies or {}
+    default_config = config or Config()
     if type(expected_status) == int:
         expected_status = [expected_status]
 
@@ -90,13 +91,15 @@ def method(http_method: str,
         return_type = arg_spec.annotations and arg_spec.annotations.get('return', Response)
         defaults = arg_spec.defaults if arg_spec.defaults else tuple()
         default_len = len(defaults)
+        args_len = len(arg_spec.args)
+        default_start_idx = args_len - default_len
 
         def merge_args_into_kwargs(*args, kwargs: Dict[str, Any]):
             if args:
                 for idx, arg in enumerate(args):
                     arg_name = arg_spec.args[idx]
-                    if idx >= len(args) - default_len:
-                        default = defaults[idx - default_len]
+                    if idx >= default_start_idx:
+                        default = defaults[idx - default_start_idx]
                     else:
                         default = None
                     name_override = default.name if default else None
@@ -126,10 +129,18 @@ def method(http_method: str,
         def wrapper(*args, **kwargs):
             merge_args_into_kwargs(*args, kwargs=kwargs)
 
+            arg0 = args[0] if len(args) > 0 else None
+            resolved_config = default_config
+            if arg0 and getattr(arg0, '_pyfeign_wrapped', False) is True:
+                cls_config = arg0._pyfeign_config
+                if cls_config is not None:
+                    cls_config.default_config = default_config
+                    resolved_config = cls_config
+
             expanded_url = url.format(*args, **kwargs)
             if not re.match(r'https?://', expanded_url):
-                if config and config.base_url:
-                    expanded_url = config.base_url + expanded_url
+                if resolved_config and resolved_config.base_url:
+                    expanded_url = resolved_config.base_url + expanded_url
                 else:
                     raise ValueError(f'Baseless URL: {expanded_url}')
 
@@ -143,10 +154,10 @@ def method(http_method: str,
             params.update(build_typed_dict('query', kwargs))
 
             body = get_body(kwargs)
-            if body and config and config.body_serializer:
-                content_type, body = config.body_serializer.serialize(body)
+            if body and resolved_config and resolved_config.body_serializer:
+                content_type, body = resolved_config.body_serializer.serialize(body)
                 headers.update({'Content-Type': content_type})
-            elif isinstance(body, Dict) or isinstance(body, List):
+            elif isinstance(body, (Dict, List,)):
                 body = json.dumps(body)
 
             request_args = dict(method=http_method,
@@ -156,8 +167,8 @@ def method(http_method: str,
                                 cookies=cookies or None,
                                 data=body)
 
-            if config and config.session:
-                resp = config.session.request(**request_args)
+            if resolved_config and resolved_config.session:
+                resp = resolved_config.session.request(**request_args)
             else:
                 resp = requests.request(**request_args)
 
@@ -248,3 +259,19 @@ def trace(url: str, *,
           default_cookies: Optional[Dict[str, Any]] = None,
           expected_status: Optional[Union[int, List[int]]] = None):
     return method('TRACE', **locals())
+
+
+def _Pyfeign(cls: Type, config: Optional[Config] = None):
+    cls._pyfeign_config = config
+    cls._pyfeign_wrapped = True
+    return cls
+
+
+def Pyfeign(cls: Optional[Type] = None, config: Optional[Config] = None):
+    if cls:
+        return _Pyfeign(cls=cls, config=config)
+    else:
+        def wrapper(w_cls):
+            return _Pyfeign(cls=w_cls, config=config)
+
+        return wrapper

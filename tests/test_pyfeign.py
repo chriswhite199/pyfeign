@@ -122,3 +122,42 @@ def test_patch(requests_mock: Mocker):
 def test_trace(requests_mock: Mocker):
     requests_mock.request('TRACE', 'http://localhost/id1')
     assert trace('id1').status_code == 200
+
+
+@pyfeign.Pyfeign
+class TestClass1:
+    @pyfeign.get('/{id}', config=config)
+    def get_by_id(self, id_val: str = pyfeign.Path('id'),
+                  query1: Optional[str] = pyfeign.Query(),
+                  query2: Optional[int] = pyfeign.Query(default=99),
+                  cookie: Optional[str] = pyfeign.Cookie(),
+                  header: Optional[str] = pyfeign.Header(name='HEADER_NAME', default='HEADER_VALUE')) -> Dict:
+        """
+        get by ID
+        """
+
+
+@pyfeign.Pyfeign(config=config)
+class TestClass2:
+    @pyfeign.get('/{id}')
+    def get_by_id(self, id_val: str = pyfeign.Path('id'),
+                  query1: Optional[str] = pyfeign.Query(),
+                  query2: Optional[int] = pyfeign.Query(default=99),
+                  cookie: Optional[str] = pyfeign.Cookie(),
+                  header: Optional[str] = pyfeign.Header(name='HEADER_NAME', default='HEADER_VALUE')) -> Dict:
+        """
+        get by ID
+        """
+
+
+def test_class(requests_mock: Mocker):
+    resp_json = dict(field1='abc')
+    requests_mock.get('http://localhost/abc?query2=99', complete_qs=True,
+                      request_headers=dict(HEADER_NAME='HEADER_VALUE'),
+                      json=resp_json)
+
+    test1: TestClass1 = TestClass1()
+    test1.get_by_id('abc')
+
+    test2: TestClass2 = TestClass2()
+    test2.get_by_id('abc')

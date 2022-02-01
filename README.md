@@ -50,7 +50,9 @@ obj_dict = get_by_id('id123')
         get_byt_id('id1', False) == http://localhost/id1?summary_details=False
         """
     ```
-*
+
 * Header
+
 * Cookie
+
 * Body
