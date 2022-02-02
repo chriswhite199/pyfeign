@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pyfeign"
 version = "0.1.0"
-description = ""
+description = "Declarative"
 authors = ["Chris White <chriswhite199@gmail.com>"]
 
 [tool.poetry.dependencies]
@@ -22,4 +22,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 log_cli = true
-log_cli_level = "DEBUG"
+log_cli_level = "WARNING"
+markers = [
+    "integration: integration tests (deselect with '-m \"!integration\"')"
+]

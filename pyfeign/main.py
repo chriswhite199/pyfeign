@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from functools import wraps
-from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List, Union, Type
+from typing import Callable, TypeVar, Any, cast, Optional, Dict, Literal, List, Union, Type, get_origin
 
 import requests
 from requests import Response, HTTPError
@@ -177,7 +177,8 @@ def method(http_method: str,
             elif resp.status_code not in expected_status:
                 raise HTTPError(f'Unexpected response HTTP:{resp.status_code} not in {expected_status}')
 
-            if return_type in [Dict, List]:
+            origin = get_origin(return_type)
+            if origin in [dict, list]:
                 return resp.json()
             elif return_type == str:
                 return resp.text

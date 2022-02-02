@@ -6,9 +6,7 @@
 2. Config - Body serializer (defaults to passing Dict as-is to request(json=))
 3. Config - Body deserializer (consumes JSON dict response)
 4. Wrap response based upon return type of function
-    * Response - http response
-    * None - just assert success code (raise_for_status)
-    * Dict / List - response.json()
-    * str - response.text
-5. Class decorator `@Pyfeign`
-    * Allow configuration of baseurl, headers, cookies, params etc
+    * [x] Response - http response
+    * [ ] None - just assert success code (raise_for_status)
+    * [x] Dict / List - response.json()
+    * [x] str - response.text
